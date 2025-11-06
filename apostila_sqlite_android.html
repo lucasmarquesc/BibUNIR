@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apostila: SQLite no Android</title>
+    <style>
+        :root {
+            --primary-color: #005ba1; /* Azul UNIR aproximado */
+            --secondary-color: #f2f2f2;
+            --code-bg: #282c34;
+            --text-color: #333;
+            --border-color: #ddd;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 30px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+
+        h1 {
+            color: var(--primary-color);
+            text-align: center;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+        }
+
+        h2 {
+            color: var(--primary-color);
+            margin-top: 35px;
+            border-left: 5px solid var(--primary-color);
+            padding-left: 10px;
+        }
+
+        h3 {
+            color: #555;
+            margin-top: 25px;
+        }
+
+        p {
+            margin-bottom: 15px;
+        }
+
+        .concept-box {
+            background-color: #eef6fc;
+            border-left: 5px solid var(--primary-color);
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 0 5px 5px 0;
+        }
+
+        .concept-title {
+            font-weight: bold;
+            color: var(--primary-color);
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        /* Estilização de Código */
+        pre {
+            background-color: var(--code-bg);
+            color: #abb2bf;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.4;
+            border: 1px solid #444;
+        }
+
+        code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        }
+
+        .filename {
+            background-color: var(--primary-color);
+            color: white;
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 5px 5px 0 0;
+            font-size: 0.9em;
+            margin-top: 20px;
+        }
+
+        .note {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.9em;
+            color: #777;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Desenvolvimento Android: Persistência com SQLite</h1>
+            <p>Este material didático tem como objetivo guiar o aluno na implementação de um banco de dados local em uma aplicação Android já existente. Focaremos na camada lógica (Java), utilizando a API nativa do Android para SQLite.</p>
+        </header>
+
+        <section>
+            <h2>1. Conceitos Fundamentais</h2>
+            <p>O Android utiliza o SQLite como seu sistema de gerenciamento de banco de dados padrão. Ele é leve, não requer um servidor separado e armazena todo o banco de dados em um único arquivo no dispositivo.</p>
+            <p>Para manipularmos este banco, precisamos entender quatro classes principais da API do Android:</p>
+
+            <div class="concept-box">
+                <span class="concept-title">SQLiteOpenHelper</span>
+                É uma classe utilitária que gerencia a criação do banco de dados e o controle de versão. Ela nos fornece os métodos <code>onCreate()</code> (executado quando o banco é criado pela primeira vez) e <code>onUpgrade()</code> (executado quando a versão do banco muda). É através dela que obtemos as referências para leitura e escrita no banco.
+            </div>
+
+            <div class="concept-box">
+                <span class="concept-title">SQLiteDatabase</span>
+                Representa o banco de dados em si. É a classe que contém os métodos para executar comandos SQL (como <code>execSQL()</code> para comandos que não retornam dados, ou <code>rawQuery()</code> para SELECTs) e métodos de conveniência para CRUD (insert, update, delete).
+            </div>
+
+            <div class="concept-box">
+                <span class="concept-title">ContentValues</span>
+                Pense nele como um "mapa" de chave/valor, usado para passar dados para os métodos <code>insert()</code> e <code>update()</code>. As <strong>chaves</strong> devem ser exatamente os nomes das colunas da sua tabela, e os <strong>valores</strong> são os dados que você deseja gravar.
+            </div>
+
+            <div class="concept-box">
+                <span class="concept-title">Cursor</span>
+                É a interface que armazena o resultado de uma consulta (query). Quando você faz um <code>SELECT</code>, o banco não te devolve uma lista pronta, ele te devolve um Cursor. Você deve percorrer esse Cursor (linha por linha) para extrair os dados e montar sua lista de objetos.
+            </div>
+        </section>
+
+        <section>
+            <h2>2. Implementação: O Helper (Gerenciador do Banco)</h2>
+            <p>O primeiro passo é criar a classe que estende <code>SQLiteOpenHelper</code>. Ela será responsável por definir o nome do banco, a versão e o script SQL de criação da tabela.</p>
+            <p>Crie a classe <code>DbHelper.java</code> no pacote <code>database</code> e adicione o seguinte código:</p>
+
+            <div class="filename">DbHelper.java</div>
+<pre><code>package com.unir.bib_unir.database;
+
+import android.content.Context;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+
+import androidx.annotation.Nullable;
+
+public class DbHelper extends SQLiteOpenHelper {
+
+    private static final String DATABASE_NAME = "bibunir";
+    private static final int DATABASE_VERSION = 1;
+    private final String CREATE_TABLE_LIVRO = "CREATE TABLE livro (" +
+            "id INTEGER PRIMARY KEY AUTOINCREMENT," +
+            "titulo TEXT," +
+            "autor TEXT ," +
+            "ano INTEGER);";
+
+    public DbHelper(@Nullable Context context) {
+        super(context, DATABASE_NAME, null, DATABASE_VERSION);
+    }
+
+    @Override
+    public void onCreate(SQLiteDatabase sqLiteDatabase) {
+        // Executa o SQL de criação quando o banco não existe
+        sqLiteDatabase.execSQL(CREATE_TABLE_LIVRO);
+    }
+
+    @Override
+    public void onUpgrade(SQLiteDatabase sqLiteDatabase, int i, int i1) {
+        // Estratégia simples de atualização: destrói e recria
+        sqLiteDatabase.execSQL("DROP TABLE IF EXISTS livro");
+        onCreate(sqLiteDatabase);
+    }
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>3. Implementação: O Padrão DAO</h2>
+            <p>Para organizar nosso código, usaremos o padrão <strong>DAO (Data Access Object)</strong>. Isso significa que todas as operações de banco ficarão isoladas em uma classe específica, deixando nossas Activities mais limpas.</p>
+
+            <h3>3.1. A Interface</h3>
+            <p>Primeiro, definimos um "contrato" do que nosso DAO deve fazer. Crie a interface <code>ILivroDAO.java</code>:</p>
+
+            <div class="filename">ILivroDAO.java</div>
+<pre><code>package com.unir.bib_unir.database;
+
+import android.content.ContentValues;
+import java.util.List;
+
+public interface ILivroDAO {
+    public ContentValues pesquisarPorId(int id);
+    public List&lt;ContentValues&gt; pesquisarPorTitulo(String titulo);
+    public List&lt;ContentValues&gt; pesquisarPorAno(int ano);
+    public List&lt;ContentValues&gt; pesquisarPorTodos();
+    public long inserir(ContentValues cv);
+    public void alterarRegistro(int id, String titulo, String autor, int ano);
+    public void deletarRegistro(int id);
+}</code></pre>
+
+            <h3>3.2. A Implementação do DAO</h3>
+            <p>Agora, a implementação real. Observe como usamos o <code>DbHelper</code> para obter as instâncias de <code>SQLiteDatabase</code> (leitura e escrita).</p>
+            <p>No método <code>pesquisar</code> (privado), vemos o uso intensivo do <strong>Cursor</strong>: movemos para o primeiro registro (<code>moveToFirst</code>) e usamos um loop <code>do/while</code> com <code>moveToNext</code> para percorrer todos os resultados.</p>
+
+            <div class="filename">LivroDAO.java</div>
+<pre><code>package com.unir.bib_unir.database;
+
+import android.annotation.SuppressLint;
+import android.content.ContentValues;
+import android.content.Context;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class LivroDAO implements ILivroDAO{
+
+    private SQLiteDatabase leitura;
+    private SQLiteDatabase escrita;
+    private DbHelper dbHelper;
+
+    public LivroDAO(Context context){
+        dbHelper = new DbHelper(context);
+        this.leitura = dbHelper.getReadableDatabase();
+        this.escrita = dbHelper.getWritableDatabase();
+    }
+
+    @SuppressLint("Range")
+    private List&lt;ContentValues&gt; pesquisar(String sql, String where[]){
+        List&lt;ContentValues&gt; lista = new ArrayList&lt;ContentValues&gt;();
+        Cursor cursor = this.leitura.rawQuery(sql,where);
+
+        if (cursor.moveToFirst()){
+            do{
+                ContentValues cv = new ContentValues();
+                // Recupera os índices das colunas e depois seus valores
+                cv.put("id", cursor.getInt(cursor.getColumnIndex("id")));
+                cv.put("titulo", cursor.getString(cursor.getColumnIndex("titulo")));
+                cv.put("autor", cursor.getString(cursor.getColumnIndex("autor")));
+                cv.put("ano", cursor.getInt(cursor.getColumnIndex("ano")));
+                lista.add(cv);
+            }while (cursor.moveToNext());
+        }
+        cursor.close(); // É importante fechar o cursor após o uso
+        return lista;
+    }
+
+    @SuppressLint("Range")
+    @Override
+    public ContentValues pesquisarPorId(int id) {
+        ContentValues cv = new ContentValues();
+        String sql = "SELECT * FROM livro WHERE id = ?";
+        String where [] = new String[]{String.valueOf(id)};
+        Cursor cursor = this.leitura.rawQuery(sql,where);
+        if(cursor.moveToFirst()){
+             cv.put("id", cursor.getInt(cursor.getColumnIndex("id")));
+             cv.put("titulo", cursor.getString(cursor.getColumnIndex("titulo")));
+             cv.put("autor", cursor.getString(cursor.getColumnIndex("autor")));
+             cv.put("ano", cursor.getInt(cursor.getColumnIndex("ano")));
+        }
+        cursor.close();
+        return cv;
+    }
+
+    @Override
+    public List&lt;ContentValues&gt; pesquisarPorTitulo(String titulo) {
+        String sql = "SELECT * FROM livro WHERE titulo LIKE ?";
+        // O uso de % permite pesquisar por partes do título
+        String where [] = new String[]{"%"+titulo+"%"};
+        return pesquisar(sql, where);
+    }
+
+    @Override
+    public List&lt;ContentValues&gt; pesquisarPorAno(int ano) {
+        String sql = "SELECT * FROM livro WHERE ano = ?";
+        String where [] = new String[]{String.valueOf(ano)};
+        return pesquisar(sql, where);
+    }
+
+    @Override
+    public List&lt;ContentValues&gt; pesquisarPorTodos() {
+        String sql = "SELECT * FROM livro ORDER BY id";
+        String where [] = null;
+        return pesquisar(sql, where);
+    }
+
+    @Override
+    public long inserir(ContentValues cv) {
+        // Retorna o ID do novo registro ou -1 em caso de erro
+        long id = this.escrita.insert("livro", null, cv);
+        return id;
+    }
+
+    @Override
+    public void alterarRegistro(int id, String titulo, String autor, int ano) {
+        ContentValues valores = new ContentValues();
+        String where = "id=?";
+        String[] whereArgs = new String[]{String.valueOf(id)};
+        valores.put("titulo", titulo);
+        valores.put("autor", autor);
+        valores.put("ano", ano);
+        this.escrita.update("livro", valores, where, whereArgs);
+        // Nota: Evite fechar o banco (this.escrita.close()) se for usar o DAO novamente na mesma tela.
+    }
+
+    @Override
+    public void deletarRegistro(int id) {
+        String where = "id=?";
+        String[] whereArgs = new String[]{String.valueOf(id)};
+        this.escrita.delete("livro", where, whereArgs);
+    }
+}</code></pre>
+        </section>
+
+        <section>
+            <h2>4. Integração com a Interface Gráfica</h2>
+            <p>Com a camada de dados pronta, vamos conectar as Activities.</p>
+
+            <h3>4.1. CadastroActivity</h3>
+            <p>Esta tela tem dupla função: <strong>Inserir</strong> (se não receber um ID) ou <strong>Atualizar</strong> (se receber um ID via Intent). Usamos <code>ContentValues</code> para empacotar os dados digitados nos campos de texto antes de enviá-los ao DAO.</p>
+
+            <div class="filename">CadastroActivity.java</div>
+<pre><code>package com.unir.bib_unir.ui;
+
+import android.content.ContentValues;
+import android.content.Intent;
+import android.os.Bundle;
+import android.view.View;
+import android.widget.Button;
+import android.widget.Toast;
+
+import androidx.activity.EdgeToEdge;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+
+import com.google.android.material.textfield.TextInputEditText;
+import com.unir.bib_unir.R;
+import com.unir.bib_unir.database.LivroDAO;
+
+public class CadastroActivity extends AppCompatActivity {
+
+    private Button btnVoltar, btnSalvar;
+    private TextInputEditText edtTitulo, edtAno, edtAutor;
+    private LivroDAO livroDAO;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        EdgeToEdge.enable(this);
+        setContentView(R.layout.activity_cadastro);
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
+            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+            return insets;
+        });
+
+        btnVoltar = findViewById(R.id.btnVoltarCadastro);
+        btnSalvar = findViewById(R.id.btnSalvarCadastro);
+        edtAno = findViewById(R.id.edtAno);
+        edtAutor = findViewById(R.id.edtAutor);
+        edtTitulo = findViewById(R.id.edtTitulo);
+        livroDAO = new LivroDAO(CadastroActivity.this);
+
+        // Verifica se é uma edição (veio um ID na intent)
+        Intent intent = getIntent();
+        final int id = intent.getIntExtra("id", 0);
+        if (id != 0){
+            // Preenche os campos com os dados existentes
+            ContentValues cv = livroDAO.pesquisarPorId(id);
+            edtTitulo.setText(cv.getAsString("titulo"));
+            edtAutor.setText(cv.getAsString("autor"));
+            edtAno.setText(String.valueOf(cv.getAsInteger("ano")));
+        }
+
+        btnSalvar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                String titulo = edtTitulo.getText().toString();
+                int ano = Integer.parseInt(edtAno.getText().toString());
+                String autor = edtAutor.getText().toString();
+
+                if (id != 0){
+                    // Modo Atualização
+                    livroDAO.alterarRegistro(id, titulo, autor, ano);
+                    Toast.makeText(CadastroActivity.this, "Cadastro atualizado!", Toast.LENGTH_SHORT).show();
+                } else {
+                    // Modo Inserção
+                    ContentValues cv = new ContentValues();
+                    cv.put("titulo", titulo);
+                    cv.put("autor", autor);
+                    cv.put("ano", ano);
+                    long res = livroDAO.inserir(cv);
+                    if (res > 0){
+                        Toast.makeText(CadastroActivity.this, "Cadastrado com sucesso!", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(CadastroActivity.this, "Erro ao cadastrar.", Toast.LENGTH_SHORT).show();
+                    }
+                }
+                finish(); // Fecha a tela após salvar
+            }
+        });
+
+        btnVoltar.setOnClickListener(v -> finish());
+    }
+}</code></pre>
+
+            <h3>4.2. MainActivity</h3>
+            <p>A tela principal orquestra a navegação. Ela usa <code>AlertDialog</code> para pedir o ID do livro quando o usuário deseja remover ou atualizar.</p>
+
+            <div class="filename">MainActivity.java</div>
+<pre><code>package com.unir.bib_unir.ui;
+
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.os.Bundle;
+import android.text.InputType;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.RadioGroup;
+import android.widget.Toast;
+
+import androidx.activity.EdgeToEdge;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+
+import com.google.android.material.textfield.TextInputEditText;
+import com.unir.bib_unir.R;
+import com.unir.bib_unir.database.LivroDAO;
+
+public class MainActivity extends AppCompatActivity {
+
+    private Button btnPesquisar, btnCadastrar, btnRemover, btnAtualizar;
+    private RadioGroup rd_PesquisarPor;
+    private TextInputEditText edtiPesquisar;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        EdgeToEdge.enable(this);
+        setContentView(R.layout.activity_main);
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
+            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+            return insets;
+        });
+
+        btnCadastrar = findViewById(R.id.btn_cadastrar);
+        btnPesquisar = findViewById(R.id.btnPesquisar);
+        edtiPesquisar = findViewById(R.id.edtTituloPesquisa);
+        rd_PesquisarPor = findViewById(R.id.radioGroup);
+        btnRemover = findViewById(R.id.btnRemover);
+        btnAtualizar = findViewById(R.id.btnAtualizar);
+
+        btnCadastrar.setOnClickListener(view -> {
+            startActivity(new Intent(MainActivity.this, CadastroActivity.class));
+        });
+
+        btnPesquisar.setOnClickListener(view -> {
+            Intent intent = new Intent(MainActivity.this, PesquisaActivity.class);
+            intent.putExtra("tipo", rd_PesquisarPor.getCheckedRadioButtonId());
+            intent.putExtra("busca", edtiPesquisar.getText().toString());
+            startActivity(intent);
+        });
+
+        btnRemover.setOnClickListener(view -> {
+            exibirDialogoId("Remover Livro", (dialog, which, id) -> {
+                LivroDAO dao = new LivroDAO(MainActivity.this);
+                dao.deletarRegistro(id);
+                Toast.makeText(MainActivity.this, "Livro removido!", Toast.LENGTH_SHORT).show();
+            });
+        });
+
+        btnAtualizar.setOnClickListener(view -> {
+            exibirDialogoId("Atualizar Livro", (dialog, which, id) -> {
+                Intent intent = new Intent(MainActivity.this, CadastroActivity.class);
+                intent.putExtra("id", id);
+                startActivity(intent);
+            });
+        });
+    }
+
+    // Método auxiliar para criar o diálogo de entrada de ID
+    private interface DialogConfirmListener {
+        void onConfirm(DialogInterface dialog, int which, int id);
+    }
+
+    private void exibirDialogoId(String titulo, DialogConfirmListener listener) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(titulo);
+        builder.setMessage("Informe o ID do livro:");
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        builder.setView(input);
+        builder.setPositiveButton("OK", (dialog, which) -> {
+            String text = input.getText().toString();
+            if (!text.isEmpty()) {
+                listener.onConfirm(dialog, which, Integer.parseInt(text));
+            }
+        });
+        builder.setNegativeButton("Cancelar", null);
+        builder.show();
+    }
+}</code></pre>
+
+            <h3>4.3. PesquisaActivity</h3>
+            <p>Esta tela recebe os parâmetros de busca da MainActivity, consulta o DAO e popula dinamicamente um <code>TableLayout</code> com os resultados.</p>
+
+            <div class="filename">PesquisaActivity.java</div>
+<pre><code>package com.unir.bib_unir.ui;
+
+import android.content.ContentValues;
+import android.content.Intent;
+import android.os.Bundle;
+import android.widget.Button;
+import android.widget.TableLayout;
+import android.widget.TableRow;
+import android.widget.TextView;
+
+import androidx.activity.EdgeToEdge;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+
+import com.unir.bib_unir.R;
+import com.unir.bib_unir.database.LivroDAO;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public class PesquisaActivity extends AppCompatActivity {
+
+    private TableLayout tabela;
+    private LivroDAO livroDAO;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        EdgeToEdge.enable(this);
+        setContentView(R.layout.activity_pesquisa);
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
+            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+            return insets;
+        });
+        tabela = findViewById(R.id.tableLayout);
+        Button btn_voltar = findViewById(R.id.btnVoltarPesquisar);
+
+        livroDAO = new LivroDAO(this);
+        Intent intent = getIntent();
+        int tipo = intent.getIntExtra("tipo", 0);
+        String busca = intent.getStringExtra("busca");
+        List&lt;ContentValues&gt; lista = new ArrayList&lt;&gt;();
+
+        // Decide qual método de pesquisa chamar baseado no RadioButton selecionado
+        if (tipo == R.id.rbTitulo){
+            lista = livroDAO.pesquisarPorTitulo(busca);
+        } else if (tipo == R.id.rbAno && !busca.isEmpty()){
+            lista = livroDAO.pesquisarPorAno(Integer.parseInt(busca));
+        } else {
+            // Default para 'Todos' ou se a busca por ano estiver vazia
+            lista = livroDAO.pesquisarPorTodos();
+        }
+
+        // Popula a tabela dinamicamente
+        if (lista != null){
+            for (ContentValues cv : lista){
+                TableRow tr = new TableRow(this);
+                // Cria as células da linha
+                tr.addView(criarCelula(String.valueOf(cv.getAsInteger("id"))));
+                tr.addView(criarCelula(cv.getAsString("titulo")));
+                tr.addView(criarCelula(cv.getAsString("autor")));
+                tr.addView(criarCelula(String.valueOf(cv.getAsInteger("ano"))));
+                tabela.addView(tr);
+            }
+        }
+
+        btn_voltar.setOnClickListener(view -> finish());
+    }
+
+    // Método auxiliar para criar TextViews para a tabela
+    private TextView criarCelula(String texto) {
+        TextView tv = new TextView(this);
+        tv.setText(texto);
+        tv.setPadding(8, 8, 8, 8);
+        return tv;
+    }
+}</code></pre>
+        </section>
+
+        <footer>
+            <p>UNIR - Desenvolvimento Mobile - Apostila de SQLite</p>
+        </footer>
+    </div>
+</body>
+</html>
