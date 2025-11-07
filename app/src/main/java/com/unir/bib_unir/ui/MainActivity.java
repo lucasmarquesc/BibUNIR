@@ -23,6 +23,9 @@ import com.unir.bib_unir.database.LivroDAO;
 
 public class MainActivity extends AppCompatActivity {
 
+    private Button btnPesquisar, btnCadastrar, btnRemover, btnAtualizar;
+    private RadioGroup rd_PesquisarPor;
+    private TextInputEditText edtiPesquisar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,7 +37,60 @@ public class MainActivity extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
+        btnCadastrar = findViewById(R.id.btn_cadastrar);
+        btnPesquisar = findViewById(R.id.btnPesquisar);
+        edtiPesquisar = findViewById(R.id.edtTituloPesquisa);
+        rd_PesquisarPor = findViewById(R.id.radioGroup);
+        btnRemover = findViewById(R.id.btnRemover);
+        btnAtualizar = findViewById(R.id.btnAtualizar);
 
+        btnCadastrar.setOnClickListener(view -> {
+            startActivity(new Intent(MainActivity.this, CadastroActivity.class));
+        });
 
+        btnPesquisar.setOnClickListener(view -> {
+            Intent intent = new Intent(MainActivity.this, PesquisaActivity.class);
+            intent.putExtra("tipo", rd_PesquisarPor.getCheckedRadioButtonId());
+            intent.putExtra("busca", edtiPesquisar.getText().toString());
+            startActivity(intent);
+        });
+
+        btnRemover.setOnClickListener(view -> {
+            exibirDialogoId("Remover Livro", (dialog, which, id) -> {
+                LivroDAO dao = new LivroDAO(MainActivity.this);
+                dao.deletarRegistro(id);
+                Toast.makeText(MainActivity.this, "Livro removido!", Toast.LENGTH_SHORT).show();
+            });
+        });
+
+        btnAtualizar.setOnClickListener(view -> {
+            exibirDialogoId("Atualizar Livro", (dialog, which, id) -> {
+                Intent intent = new Intent(MainActivity.this, CadastroActivity.class);
+                intent.putExtra("id", id);
+                startActivity(intent);
+            });
+        });
+    }
+
+    // Método auxiliar para criar o diálogo de entrada de ID
+    private interface DialogConfirmListener {
+        void onConfirm(DialogInterface dialog, int which, int id);
+    }
+
+    private void exibirDialogoId(String titulo, DialogConfirmListener listener) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle(titulo);
+        builder.setMessage("Informe o ID do livro:");
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        builder.setView(input);
+        builder.setPositiveButton("OK", (dialog, which) -> {
+            String text = input.getText().toString();
+            if (!text.isEmpty()) {
+                listener.onConfirm(dialog, which, Integer.parseInt(text));
+            }
+        });
+        builder.setNegativeButton("Cancelar", null);
+        builder.show();
     }
 }
